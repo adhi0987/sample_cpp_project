@@ -1,54 +1,16 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Word Count History</title>
     <style>
-        body {
-            font-family: sans-serif;
-            padding: 50px;
-            background: #f0f2f5;
-        }
-
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 400px;
-            margin: auto;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        input,
-        button {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            box-sizing: border-box;
-        }
-
-        button {
-            background: #007bff;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        td {
-            border-bottom: 1px solid #eee;
-            padding: 10px;
-        }
+        body { font-family: sans-serif; padding: 50px; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        td { border-bottom: 1px solid #eee; padding: 10px; }
     </style>
 </head>
-
 <body>
     <div class="card">
         <h2>History App</h2>
@@ -61,47 +23,46 @@
     <script>
         const API_URL = "https://sample-cpp-project-backend.onrender.com"; // Change this after deploying backend
 
-        async function sendData() {
-            const user = document.getElementById('user').value.trim();
-            const text = document.getElementById('sentence').value.trim();
+async function sendData() {
+    const user = document.getElementById('user').value.trim();
+    const text = document.getElementById('sentence').value.trim();
 
-            console.log(`[FRONTEND] Sending data for user: ${user}`);
+    console.log(`[FRONTEND] Sending data for user: ${user}`);
 
-            if (!user || !text) {
-                alert("Please fill both fields");
-                return;
-            }
+    if (!user || !text) {
+        alert("Please fill both fields");
+        return;
+    }
 
-            try {
-                const saveRes = await fetch(`${API_URL}/add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, sentence: text })
-                });
+    try {
+        const saveRes = await fetch(`${API_URL}/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, sentence: text })
+        });
 
-                // Log response status for debugging
-                console.log(`[FRONTEND] /add Response Status: ${saveRes.status}`);
+        // Log response status for debugging
+        console.log(`[FRONTEND] /add Response Status: ${saveRes.status}`);
 
-                if (!saveRes.ok) {
-                    const errorText = await saveRes.text();
-                    throw new Error(`Server Error: ${errorText}`);
-                }
-
-                const historyRes = await fetch(`${API_URL}/history/${user}`);
-                const data = await historyRes.json();
-                console.log(`[FRONTEND] History loaded:`, data.history);
-
-                const table = document.getElementById('historyTable');
-                table.innerHTML = "<tr><th>Username</th><th>Word Count History</th></tr>";
-                table.innerHTML += data.history.map(c => `<tr><td>${user}</td><td>${c} words</td></tr>`).join('');
-
-                document.getElementById('sentence').value = "";
-            } catch (err) {
-                console.error("[FRONTEND ERROR]", err);
-                alert(`Error: ${err.message}. Check Render dashboard logs for backend details.`);
-            }
+        if (!saveRes.ok) {
+            const errorText = await saveRes.text();
+            throw new Error(`Server Error: ${errorText}`);
         }
+
+        const historyRes = await fetch(`${API_URL}/history/${user}`);
+        const data = await historyRes.json();
+        console.log(`[FRONTEND] History loaded:`, data.history);
+
+        const table = document.getElementById('historyTable');
+        table.innerHTML = "<tr><th>Word Count History</th></tr>";
+        table.innerHTML += data.history.map(c => `<tr><td>${c} words</td></tr>`).join('');
+        
+        document.getElementById('sentence').value = ""; 
+    } catch (err) {
+        console.error("[FRONTEND ERROR]", err);
+        alert(`Error: ${err.message}. Check Render dashboard logs for backend details.`);
+    }
+}
     </script>
 </body>
-
 </html>
