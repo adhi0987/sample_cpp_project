@@ -22,7 +22,7 @@ int main() {
     string CONN_STR = db_url_env ? db_url_env : "your_local_db_url_here";
     
     char* port_env = getenv("PORT");
-    uint16_t port = static_cast<uint16_t>(port_env ? stoi(port_env) : 8080);
+    uint16_t port = static_cast<uint16_t>(port_env ? stoi(port_env) : 10000);
 
     // 2. ROUTE: Add new entry
     CROW_ROUTE(app, "/add").methods("POST"_method, "OPTIONS"_method)([&](const crow::request& req) {
