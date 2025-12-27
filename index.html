@@ -54,8 +54,8 @@ async function sendData() {
         console.log(`[FRONTEND] History loaded:`, data.history);
 
         const table = document.getElementById('historyTable');
-        table.innerHTML = "<tr><th>Username</th><th>Word Count History</th></tr>";
-        table.innerHTML += data.history.map(c => `<tr><td>${user}</td><td>${c} words</td></tr>`).join('');
+        table.innerHTML = "<tr><th>Username</th><th>Sentence</th><th>Word Count History</th></tr>";
+        table.innerHTML += data.history.map(c => `<tr><td>${user}</td><td>${text}</td><td>${c} words</td></tr>`).join('');
         
         document.getElementById('sentence').value = ""; 
     } catch (err) {
