@@ -1,4 +1,4 @@
-#include "crow.h"
+#include <crow.h>
 #include <pqxx/pqxx>
 #include <sstream>
 #include <cstdlib>
@@ -7,14 +7,24 @@
 
 using namespace std;
 
-// Helper to ensure all responses have CORS headers to prevent "(failed)" in browser
-crow::response cors_response(int status, string body = "") {
-    crow::response res(status, body);
-    res.add_header("Access-Control-Allow-Origin", "*");
-    res.add_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    res.add_header("Access-Control-Allow-Headers", "Content-Type");
-    return res;
-}
+// Global Middleware to handle CORS for all routes and preflight requests
+struct CORSMiddleware {
+    struct context {};
+    void before_handle(crow::request& req, crow::response& res, context& ctx) {
+        // Handle preflight OPTIONS requests automatically
+        if (req.method == "OPTIONS"_method) {
+            res.add_header("Access-Control-Allow-Origin", "*");
+            res.add_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+            res.add_header("Access-Control-Allow-Headers", "Content-Type");
+            res.code = 204;
+            res.end(); 
+        }
+    }
+    void after_handle(crow::request& req, crow::response& res, context& ctx) {
+        // Add CORS headers to every response (Success or Error)
+        res.add_header("Access-Control-Allow-Origin", "*");
+    }
+};
 
 int countWords(string s) {
     stringstream ss(s);
@@ -25,7 +35,8 @@ int countWords(string s) {
 }
 
 int main() {
-    crow::SimpleApp app;
+    // Use the CORSMiddleware in the App definition
+    crow::App<CORSMiddleware> app;
 
     const char* db_url_env = getenv("DATABASE_URL");
     string CONN_STR = db_url_env ? db_url_env : "";
@@ -33,70 +44,53 @@ int main() {
     char* port_env = getenv("PORT");
     uint16_t port = static_cast<uint16_t>(port_env ? stoi(port_env) : 10000);
 
-    // Initial Debug Log
     cout << "[INIT] Server starting on port: " << port << endl;
     if (CONN_STR.empty()) {
         cerr << "[CRITICAL] DATABASE_URL is not set!" << endl;
-    } else {
-        cout << "[INIT] Database URL found (Connection will be attempted on request)" << endl;
     }
 
-    CROW_ROUTE(app, "/add").methods("POST"_method, "OPTIONS"_method)([&](const crow::request& req) {
-        if (req.method == "OPTIONS"_method) return cors_response(204);
-        
-        cout << "[DEBUG] Received /add request" << endl;
-        
+    CROW_ROUTE(app, "/add").methods("POST"_method)([&](const crow::request& req) {
         auto body = crow::json::load(req.body);
-        if (!body) {
-            cerr << "[ERROR] Failed to parse JSON body" << endl;
-            return cors_response(400, "Invalid JSON");
-        }
+        if (!body) return crow::response(400, "Invalid JSON");
 
         string user = body["username"].s();
         string text = body["sentence"].s();
-        cout << "[DEBUG] User: " << user << " | Sentence length: " << text.length() << endl;
 
         try {
-            cout << "[DB] Connecting to Supabase..." << endl;
             pqxx::connection C(CONN_STR);
             pqxx::work W(C);
             int words = countWords(text);
             
-            W.exec("INSERT INTO user_word_count_history (username, word_count) VALUES (" + 
-                   W.quote(user) + ", " + to_string(words) + ")");
+            // Use exec_params to prevent SQL Injection
+            W.exec_params("INSERT INTO user_word_count_history (username, word_count) VALUES ($1, $2)", 
+                         user, words);
             W.commit();
-            cout << "[DB] Successfully inserted record for " << user << endl;
-            return cors_response(200, "Success");
+            return crow::response(200, "Success");
         } catch (const std::exception &e) {
             cerr << "[DB ERROR] " << e.what() << endl;
-            // Returning 500 with CORS header so the browser shows the error instead of "(failed)"
-            return cors_response(500, string("Database Error: ") + e.what());
+            return crow::response(500, string("Database Error: ") + e.what());
         }
     });
 
     CROW_ROUTE(app, "/history/<string>")([&](string user) {
-        cout << "[DEBUG] Fetching history for user: " << user << endl;
         std::vector<crow::json::wvalue> history_vec;
-
         try {
             pqxx::connection C(CONN_STR);
             pqxx::nontransaction N(C);
-            pqxx::result R = N.exec("SELECT word_count FROM user_word_count_history WHERE username = " + N.quote(user) + " ORDER BY id DESC");
+            // Use exec_params for safe querying
+            pqxx::result R = N.exec_params("SELECT word_count FROM user_word_count_history WHERE username = $1 ORDER BY id DESC", user);
             
             for (auto row : R) {
                 history_vec.push_back(row[0].as<int>());
             }
-            cout << "[DB] Fetched " << history_vec.size() << " records" << endl;
         } catch (const std::exception &e) {
             cerr << "[DB ERROR] " << e.what() << endl;
-            return cors_response(500, e.what());
+            return crow::response(500, e.what());
         }
 
         crow::json::wvalue json_res;
         json_res["history"] = std::move(history_vec);
-        auto res = cors_response(200, json_res.dump());
-        res.add_header("Content-Type", "application/json");
-        return res;
+        return crow::response(200, json_res);
     });
 
     app.port(port).multithreaded().run();
