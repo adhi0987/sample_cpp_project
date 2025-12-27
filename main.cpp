@@ -23,6 +23,9 @@ struct CORSMiddleware {
     void after_handle(crow::request& req, crow::response& res, context& ctx) {
         // Add CORS headers to every response (Success or Error)
         res.add_header("Access-Control-Allow-Origin", "*");
+        res.add_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+        res.add_header("Access-Control-Allow-Headers", "Content-Type");
+
     }
 };
 
@@ -51,11 +54,12 @@ int main() {
 
     CROW_ROUTE(app, "/add").methods("POST"_method)([&](const crow::request& req) {
         auto body = crow::json::load(req.body);
+        cout << "[INFO] /add endpoint hit" << endl;
         if (!body) return crow::response(400, "Invalid JSON");
 
         string user = body["username"].s();
         string text = body["sentence"].s();
-
+        cout<<"[INFO] Received data from user: " << user << endl;
         try {
             pqxx::connection C(CONN_STR);
             pqxx::work W(C);
@@ -65,6 +69,7 @@ int main() {
             W.exec_params("INSERT INTO user_word_count_history (username, word_count) VALUES ($1, $2)", 
                          user, words);
             W.commit();
+            cout << "[INFO] Data inserted successfully for user: " << user << endl;
             return crow::response(200, "Success");
         } catch (const std::exception &e) {
             cerr << "[DB ERROR] " << e.what() << endl;
